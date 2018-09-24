@@ -1,21 +1,21 @@
 import utime
-from dstemp import TemperatureSensor
+from dstemp import DSTempSensor
 
 time_temp_last_read = 0
+
 
 def main():
     global time_temp_last_read
 
-    t = TemperatureSensor(14, 10)
+    DSTemp = DSTempSensor(14, 10)
 
     while True:
         now = utime.ticks_ms()
 
-        last_temp_time_span = utime.ticks_diff(now, time_temp_last_read)
-
-        if last_temp_time_span > 1000:
-            temp = t.read_temp()
-            print(temp)
+        time_span = utime.ticks_diff(now, time_temp_last_read)
+        if time_span > 1000:
+            temps = DSTemp.read_temp()
+            print(temps)
             time_temp_last_read = now
 
 

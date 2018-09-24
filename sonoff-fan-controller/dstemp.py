@@ -26,7 +26,7 @@ from machine import Pin
 from onewire import OneWire
 
 
-class TemperatureSensor:
+class DSTempSensor:
     """
     Represents a Temperature sensor
     """
@@ -74,8 +74,7 @@ class TemperatureSensor:
 
         avg_temp = sum(self.temps) / len(self.temps)
 
-        return ([avg_temp, self.c_to_f(avg_temp)])
-
+        return [avg_temp, self.c_to_f(avg_temp)]
 
     @staticmethod
     def c_to_f(c):
@@ -92,7 +91,7 @@ class TemperatureSensor:
 def main():
     # Get temp once per second indefinitely as demo.
     pin_num = input('Enter the pin#:')
-    t = TemperatureSensor(int(pin_num), 10)
+    t = DSTempSensor(int(pin_num), 10)
     while True:
         print(t.read_temp())
         utime.sleep_ms(1000)  # Must be >= 750
