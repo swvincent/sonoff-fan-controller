@@ -49,6 +49,10 @@ class DSTempSensor:
         self.temps = [0] * samples
         self.temps_pos = 0
 
+        # Force initial convert_temp and delay to avoid bad values
+        self.ds.convert_temp()
+        utime.sleep_ms(750)
+
     def read_temp(self):
         """
         Reads temperature from a single DS18X20. It's assumed this will

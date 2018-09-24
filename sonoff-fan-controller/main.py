@@ -74,23 +74,35 @@ def button_pressed(p):
         time_last_button_press = time_pressed
 
 
-def process_mode(temp):
+def toggle_relay(temp):
+    global run_mode
     if run_mode == RunMode.AUTO:
         if temp > FAN_ON_TEMP and not relay.value():
             print('Temp too high, closing relay')
             relay.value(1)
-            led.value(0)
         elif temp < FAN_OFF_TEMP and relay.value():
             print('Temp under control, opening relay')
             relay.value(0)
-            led.value(1)
     elif run_mode == RunMode.ON and not relay.value():
         print ('On mode, closing relay')
         relay.value(1)
-        led.value(0)
     elif run_mode == RunMode.OFF and relay.value():
         print ('Off mode; opening relay')
         relay.value(0)
+
+
+def toggle_led():
+    global run_mode
+    if run_mode == RunMode.AUTO:
+        if relay.value():
+            pulse_val = utime.ticks_ms() % 1000
+            led.value(pulse_val > 10)
+        else:
+            pulse_val = utime.ticks_ms() % 5000
+            led.value(pulse_val > 10)
+    elif run_mode == RunMode.ON and led.value():
+        led.value(0)
+    elif run_mode == RunMode.OFF and not led.value():
         led.value(1)
 
 
@@ -107,10 +119,13 @@ def main():
             print(run_mode, temps)
             time_temp_last_read = now
 
-        process_mode(temps[1])
+        toggle_relay(temps[1])
+        toggle_led()
+
 
 # Setup button interrupt. Input goes low on press, high on release
 button.irq(trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING, handler=button_pressed)
+
 
 if __name__ == '__main__':
     main()
