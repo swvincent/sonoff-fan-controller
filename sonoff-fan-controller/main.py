@@ -1,5 +1,21 @@
-import utime
-from machine import Pin
+"""
+sonoff-fan-controller
+
+Control a fan using a SonOff Basic WiFi Smart Switch. Provides
+temperature-based automatic control and manual override. LED
+indicates status. Should be adaptable to other ESP8266-based
+devices and boards.
+
+www.swvincent.com
+
+https://github.com/swvincent/sonoff-fan-controller
+
+Copyright (c) 2018 Scott W. Vincent
+
+Shared under an MIT License
+"""
+import utime, math
+from machine import Pin, PWM
 from dstemp import DSTempSensor
 
 
@@ -16,13 +32,17 @@ FAN_ON_TEMP = 84
 FAN_OFF_TEMP = 80
 
 # Global variables
+temps = [0, 0]
 time_temp_last_read = 0
 time_last_button_press = 0
+time_last_pwm = 0
+pwm_counter = 0
 run_mode = RunMode.AUTO
 
 # GPIO Setup
 button = Pin(0, Pin.IN, Pin.PULL_UP)
 led = Pin(13, Pin.OUT)
+pwm = PWM(led)
 relay = Pin(12, Pin.OUT)
 temp_sensor = DSTempSensor(14, 10)
 
@@ -31,13 +51,24 @@ led.on()
 relay.off()
 
 
-def change_relay_state():
+def pulse_led():
     """
-    Toggle value of relay and LED. Note
-    that led is NC so it's opposite.
+    Pulse LED for 'sleeping' effect
+    Based on Micropython docs PWM tutorial
     """
-    relay.value(led.value())
-    led.value(not led.value())
+    global time_last_pwm, pwm_counter
+
+    now = utime.ticks_ms()
+
+    # Update LED every 50ms
+    time_span = utime.ticks_diff(now, time_last_pwm)
+
+    if time_span > 50:
+        pwm_counter += 1
+        if pwm_counter > 100:
+            pwm_counter = 1
+        pwm.duty(int(math.sin(pwm_counter / 50 * math.pi) * 500 + 500))
+        time_last_pwm = now
 
 
 def button_pressed(p):
@@ -95,19 +126,21 @@ def toggle_led():
     global run_mode
     if run_mode == RunMode.AUTO:
         if relay.value():
-            pulse_val = utime.ticks_ms() % 1000
-            led.value(pulse_val > 10)
+            pulse_led()
         else:
-            pulse_val = utime.ticks_ms() % 5000
-            led.value(pulse_val > 10)
+            pwm.deinit()
+            led_time = utime.ticks_ms() % 5000
+            led.value(led_time > 10)
     elif run_mode == RunMode.ON and led.value():
+        pwm.deinit()
         led.value(0)
     elif run_mode == RunMode.OFF and not led.value():
+        pwm.deinit()
         led.value(1)
 
 
 def main():
-    global time_temp_last_read
+    global temps, time_temp_last_read
 
     while True:
         now = utime.ticks_ms()
