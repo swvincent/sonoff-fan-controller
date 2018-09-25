@@ -19,6 +19,7 @@ from machine import Pin, PWM
 from dstemp import DSTempSensor
 
 
+# RunMode "Enum"
 class RunMode:
     OFF = 0
     ON = 1
@@ -46,14 +47,14 @@ pwm = PWM(led)
 relay = Pin(12, Pin.OUT)
 temp_sensor = DSTempSensor(14, 10)
 
-# Everything off at start. led is "normally closed"
+# Relay/LED off at start. led lights w/ output low
 led.on()
 relay.off()
 
 
-def pulse_led():
+def breathe_led():
     """
-    Pulse LED for 'sleeping' effect
+    Pulse LED for 'breathing' effect
     Based on Micropython docs PWM tutorial
     """
     global time_last_pwm, pwm_counter
@@ -72,6 +73,7 @@ def pulse_led():
 
 
 def button_pressed(p):
+    """Determine button press type and action to take"""
     global time_last_button_press, run_mode
 
     time_pressed = utime.ticks_ms()
@@ -82,7 +84,6 @@ def button_pressed(p):
 
         if hold_length > LONG_PRESS_TIME:
             # Long press
-            # Short press
             print('Long press ({}ms)'.format(hold_length))
             if run_mode == RunMode.AUTO:
                 run_mode = relay.value()
@@ -105,13 +106,28 @@ def button_pressed(p):
         time_last_button_press = time_pressed
 
 
-def toggle_relay(temp):
-    global run_mode
+def update_temps():
+    """Get temperature every second"""
+    global temps, time_temp_last_read
+
+    now = utime.ticks_ms()
+
+    # Get temp every second
+    time_span = utime.ticks_diff(now, time_temp_last_read)
+    if time_span > 1000:
+        temps = temp_sensor.read_temp()
+        print(run_mode, temps)
+        time_temp_last_read = now
+
+
+def toggle_relay():
+    """Open/close relay based on mode and temperature"""
+    global run_mode, temps
     if run_mode == RunMode.AUTO:
-        if temp > FAN_ON_TEMP and not relay.value():
+        if temps[1] > FAN_ON_TEMP and not relay.value():
             print('Temp too high, closing relay')
             relay.value(1)
-        elif temp < FAN_OFF_TEMP and relay.value():
+        elif temps[1] < FAN_OFF_TEMP and relay.value():
             print('Temp under control, opening relay')
             relay.value(0)
     elif run_mode == RunMode.ON and not relay.value():
@@ -123,36 +139,33 @@ def toggle_relay(temp):
 
 
 def toggle_led():
+    """Toggle LED to indicate mode and status"""
     global run_mode
+
     if run_mode == RunMode.AUTO:
         if relay.value():
-            pulse_led()
+            # Fan running in auto; breathing effect
+            breathe_led()
         else:
+            # Fan off in auto; pulse every 4 sec.
             pwm.deinit()
-            led_time = utime.ticks_ms() % 5000
+            led_time = utime.ticks_ms() % 4000
             led.value(led_time > 10)
     elif run_mode == RunMode.ON and led.value():
+        # Fan forced on, LED is on
         pwm.deinit()
         led.value(0)
     elif run_mode == RunMode.OFF and not led.value():
+        # Fan forced off, LED is off
         pwm.deinit()
         led.value(1)
 
 
 def main():
-    global temps, time_temp_last_read
-
+    """Main program loop"""
     while True:
-        now = utime.ticks_ms()
-
-        # Get temp every second
-        time_span = utime.ticks_diff(now, time_temp_last_read)
-        if time_span > 1000:
-            temps = temp_sensor.read_temp()
-            print(run_mode, temps)
-            time_temp_last_read = now
-
-        toggle_relay(temps[1])
+        update_temps()
+        toggle_relay()
         toggle_led()
 
 
